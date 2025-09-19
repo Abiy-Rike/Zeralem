@@ -10,7 +10,7 @@ interface VideoPlayerProps {
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, onClose }) => {
   const isMockVideo = video.id.startsWith('mock-');
   const youtubeUrl = isMockVideo ? '#' : `https://www.youtube.com/watch?v=${video.id}`;
-  const embedUrl = isMockVideo ? '' : `https://www.youtube.com/embed/${video.id}`;
+  const embedUrl = isMockVideo ? '' : `https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1`;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -44,19 +44,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, onClose }) => {
               <div className="text-center text-white">
                 <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
                 <h3 className="text-xl font-medium mb-2">Demo Video Content</h3>
-                <p className="text-gray-300 mb-4">This is a sample course video</p>
+                <p className="text-gray-300 mb-4">"{video.title}"</p>
                 <p className="text-sm text-gray-400">
-                  Connect your YouTube API key to view actual course videos
+                  Add your YouTube API key to .env file to view actual course videos
                 </p>
               </div>
             </div>
           ) : (
             <iframe
-              src={embedUrl}
+              src={`https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`}
               title={video.title}
               className="w-full h-full"
               frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
             />
           )}
