@@ -8,9 +8,34 @@ interface VideoPlayerProps {
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, onClose }) => {
-  const isMockVideo = video.id.startsWith('mock-');
-  const youtubeUrl = isMockVideo ? '#' : `https://www.youtube.com/watch?v=${video.id}`;
-  const embedUrl = isMockVideo ? '' : `https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1`;
+  // Extract clean video ID from potential URL
+  const extractVideoId = (id: string): string => {
+    // If it's already just an ID, return it
+    if (!/^https?:\/\//.test(id)) {
+      return id;
+    }
+
+    // Handle various YouTube URL formats
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/v\/([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ];
+
+    for (const pattern of patterns) {
+      const match = id.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+
+    return id;
+  };
+
+  const cleanVideoId = extractVideoId(video.id);
+  const isValidVideoId = /^[a-zA-Z0-9_-]{11}$/.test(cleanVideoId);
+  const youtubeUrl = isValidVideoId ? `https://www.youtube.com/watch?v=${cleanVideoId}` : '#';
+  const embedUrl = isValidVideoId ? `https://www.youtube.com/embed/${cleanVideoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1` : '';
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -18,7 +43,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, onClose }) => {
         <div className="flex items-center justify-between p-6 border-b">
           <h3 className="text-xl font-bold text-gray-900 pr-8">{video.title}</h3>
           <div className="flex items-center gap-2">
-            {!isMockVideo && (
+            {isValidVideoId && (
               <a
                 href={youtubeUrl}
                 target="_blank"
@@ -39,20 +64,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, onClose }) => {
         </div>
         
         <div className="aspect-video">
-          {isMockVideo ? (
+          {!isValidVideoId ? (
             <div className="w-full h-full bg-gray-900 flex items-center justify-center">
               <div className="text-center text-white">
                 <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <h3 className="text-xl font-medium mb-2">Demo Video Content</h3>
+                <h3 className="text-xl font-medium mb-2">Video Not Available</h3>
                 <p className="text-gray-300 mb-4">"{video.title}"</p>
                 <p className="text-sm text-gray-400">
-                  Add your YouTube API key to .env file to view actual course videos
+                  Invalid video ID or video may have been removed
                 </p>
               </div>
             </div>
           ) : (
             <iframe
-              src={`https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1`}
+              src={embedUrl}
               title={video.title}
               className="w-full h-full"
               frameBorder="0"

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { PERMANENT_PLAYLISTS } from '../data/permanentVideos';
 
 const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const YOUTUBE_BASE_URL = 'https://www.googleapis.com/youtube/v3';
@@ -29,12 +30,37 @@ export class YouTubeService {
     this.apiKey = YOUTUBE_API_KEY;
   }
 
+  // Helper function to extract YouTube video ID from various URL formats
+  private extractVideoId(url: string): string {
+    // If it's already just an ID, return it
+    if (!/^https?:\/\//.test(url)) {
+      return url;
+    }
+
+    // Handle various YouTube URL formats
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/v\/([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+
+    // If no pattern matches, return the original string
+    return url;
+  }
+
   async getChannelPlaylists(channelHandle: string): Promise<YouTubePlaylist[]> {
     try {
       // Check if API key is available
       if (!this.apiKey || this.apiKey === 'your_youtube_api_key_here') {
-        console.warn('YouTube API key not available, using mock data');
-        return this.getMockPlaylists();
+        console.warn('YouTube API key not available, using permanent video database');
+        return this.getPermanentPlaylists();
       }
 
       // First, get channel ID from handle
@@ -72,8 +98,8 @@ export class YouTubeService {
       }));
     } catch (error) {
       console.error('Error fetching playlists:', error);
-      console.warn('Falling back to mock data due to API error');
-      return this.getMockPlaylists();
+      console.warn('Falling back to permanent video database due to API error');
+      return this.getPermanentPlaylists();
     }
   }
 
@@ -81,8 +107,8 @@ export class YouTubeService {
     try {
       // Check if API key is available
       if (!this.apiKey || this.apiKey === 'your_youtube_api_key_here') {
-        console.warn('YouTube API key not available, using mock data');
-        return this.getMockVideos(playlistId);
+        console.warn('YouTube API key not available, using permanent video database');
+        return this.getPermanentVideos(playlistId);
       }
 
       const response = await axios.get(`${YOUTUBE_BASE_URL}/playlistItems`, {
@@ -106,7 +132,7 @@ export class YouTubeService {
       });
 
       return videosResponse.data.items.map((item: any) => ({
-        id: item.id,
+        id: this.extractVideoId(item.id), // Ensure we have clean video ID
         title: item.snippet.title,
         description: item.snippet.description,
         thumbnailUrl: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
@@ -116,81 +142,37 @@ export class YouTubeService {
       }));
     } catch (error) {
       console.error('Error fetching playlist videos:', error);
-      console.warn('Falling back to mock data due to API error');
-      return this.getMockVideos(playlistId);
+      console.warn('Falling back to permanent video database due to API error');
+      return this.getPermanentVideos(playlistId);
     }
   }
 
-  private getMockPlaylists(): YouTubePlaylist[] {
-    return [
-      {
-        id: 'mock-math-1',
-        title: 'Advanced Mathematics Course',
-        description: 'Comprehensive mathematics course covering algebra, calculus, and more',
-        thumbnailUrl: 'https://images.pexels.com/photos/6256/mathematics-blackboard-education-classroom.jpg?auto=compress&cs=tinysrgb&w=800',
-        videoCount: 25,
-        publishedAt: '2024-01-01T00:00:00Z'
-      },
-      {
-        id: 'mock-physics-1',
-        title: 'Physics Fundamentals',
-        description: 'Essential physics concepts and problem-solving techniques',
-        thumbnailUrl: 'https://images.pexels.com/photos/256541/pexels-photo-256541.jpeg?auto=compress&cs=tinysrgb&w=800',
-        videoCount: 18,
-        publishedAt: '2024-01-15T00:00:00Z'
-      },
-      {
-        id: 'mock-chemistry-1',
-        title: 'Chemistry Essentials',
-        description: 'Core chemistry principles and laboratory techniques',
-        thumbnailUrl: 'https://images.pexels.com/photos/2280549/pexels-photo-2280549.jpeg?auto=compress&cs=tinysrgb&w=800',
-        videoCount: 22,
-        publishedAt: '2024-02-01T00:00:00Z'
-      },
-      {
-        id: 'mock-biology-1',
-        title: 'Biology Comprehensive',
-        description: 'Complete biology course from cells to ecosystems',
-        thumbnailUrl: 'https://images.pexels.com/photos/2280571/pexels-photo-2280571.jpeg?auto=compress&cs=tinysrgb&w=800',
-        videoCount: 30,
-        publishedAt: '2024-02-15T00:00:00Z'
-      },
-      {
-        id: 'mock-programming-1',
-        title: 'Programming Fundamentals',
-        description: 'Learn programming concepts and practical coding skills',
-        thumbnailUrl: 'https://images.pexels.com/photos/546819/pexels-photo-546819.jpeg?auto=compress&cs=tinysrgb&w=800',
-        videoCount: 35,
-        publishedAt: '2024-03-01T00:00:00Z'
-      },
-      {
-        id: 'mock-literature-1',
-        title: 'English Literature Analysis',
-        description: 'Deep dive into classic and modern literature',
-        thumbnailUrl: 'https://images.pexels.com/photos/159711/books-bookstore-book-reading-159711.jpeg?auto=compress&cs=tinysrgb&w=800',
-        videoCount: 20,
-        publishedAt: '2024-03-15T00:00:00Z'
-      }
-    ];
+  private getPermanentPlaylists(): YouTubePlaylist[] {
+    return PERMANENT_PLAYLISTS.map(playlist => ({
+      id: playlist.id,
+      title: playlist.title,
+      description: playlist.description,
+      thumbnailUrl: playlist.thumbnailUrl,
+      videoCount: playlist.videoCount,
+      publishedAt: playlist.publishedAt
+    }));
   }
 
-  private getMockVideos(playlistId: string): YouTubeVideo[] {
-    const videoCount = Math.floor(Math.random() * 20) + 10; // 10-30 videos
-    const videos: YouTubeVideo[] = [];
-    
-    for (let i = 1; i <= videoCount; i++) {
-      videos.push({
-        id: `${playlistId}-video-${i}`,
-        title: `Lesson ${i}: Topic Overview`,
-        description: `Comprehensive lesson covering important concepts and practical applications.`,
-        thumbnailUrl: 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg?auto=compress&cs=tinysrgb&w=800',
-        duration: `${Math.floor(Math.random() * 30) + 5}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-        publishedAt: '2024-01-01T00:00:00Z',
-        viewCount: (Math.floor(Math.random() * 10000) + 1000).toString()
-      });
+  private getPermanentVideos(playlistId: string): YouTubeVideo[] {
+    const playlist = PERMANENT_PLAYLISTS.find(p => p.id === playlistId);
+    if (!playlist) {
+      return [];
     }
-    
-    return videos;
+
+    return playlist.videos.map(video => ({
+      id: this.extractVideoId(video.id), // Ensure clean video ID
+      title: video.title,
+      description: video.description,
+      thumbnailUrl: video.thumbnailUrl,
+      duration: video.duration,
+      publishedAt: video.publishedAt,
+      viewCount: video.viewCount
+    }));
   }
 
   private formatDuration(duration: string): string {
