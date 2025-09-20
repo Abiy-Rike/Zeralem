@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { YouTubeService, YouTubePlaylist, YouTubeVideo } from '../services/youtubeApi';
 import { GeminiService, CourseMetadata } from '../services/geminiApi';
+import { URLCacheService, CachedPlaylist } from '../services/urlCache';
+import { PERMANENT_PLAYLISTS } from '../data/permanentVideos';
 
 export interface Course {
   id: string;
@@ -30,30 +32,51 @@ export const useCourses = () => {
         setLoading(true);
         setError(null);
 
-        const youtubeService = new YouTubeService();
-        const geminiService = new GeminiService();
-
-        // Fetch playlists from the Zeralem channel
-        const playlists = await youtubeService.getChannelPlaylists('@ZERALEM2127');
+        // First, try to load from url.txt cache
+        let playlists: CachedPlaylist[] = await URLCacheService.loadCachedURLs();
         
+        // If no cache exists, fall back to permanent data
+        if (playlists.length === 0) {
+          console.log('📄 Using permanent video database');
+          playlists = PERMANENT_PLAYLISTS.map(p => ({
+            id: p.id,
+            title: p.title,
+            description: p.description,
+            thumbnailUrl: p.thumbnailUrl,
+            videoCount: p.videoCount,
+            publishedAt: p.publishedAt,
+            videos: p.videos.map(v => ({
+              id: v.id,
+              title: v.title,
+              description: v.description,
+              thumbnailUrl: v.thumbnailUrl,
+              duration: v.duration,
+              publishedAt: v.publishedAt,
+              viewCount: v.viewCount,
+              playlistId: v.playlistId
+            }))
+          }));
+        }
+
         const coursesData: Course[] = [];
 
         for (const playlist of playlists) {
           try {
-            // Get videos for each playlist
-            const videos = await youtubeService.getPlaylistVideos(playlist.id);
+            const videos = playlist.videos;
             
             if (videos.length === 0) continue;
 
-            // Generate course metadata using AI
+            // Use cached data or generate metadata
             const videoTitles = videos.slice(0, 10).map(v => v.title); // Use first 10 video titles
             
-            // Add delay between API calls to avoid rate limiting
-            if (coursesData.length > 0) {
-              await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-            }
-            
-            const metadata = await geminiService.generateCourseMetadata(playlist.title, videoTitles);
+            // For cached data, we can skip AI generation and use simple inference
+            const metadata = {
+              title: playlist.title,
+              description: playlist.description || 'Comprehensive course covering essential topics and practical applications.',
+              category: inferCategory(playlist.title),
+              level: 'Intermediate' as const,
+              estimatedDuration: '10 hours'
+            };
 
             // Calculate total duration
             const totalMinutes = videos.reduce((acc, video) => {
@@ -81,7 +104,15 @@ export const useCourses = () => {
               level: metadata.level,
               category: metadata.category,
               price: "Free",
-              videos: videos,
+              videos: videos.map(v => ({
+                id: v.id,
+                title: v.title,
+                description: v.description,
+                thumbnailUrl: v.thumbnailUrl,
+                duration: v.duration,
+                publishedAt: v.publishedAt,
+                viewCount: v.viewCount
+              })),
               playlistId: playlist.id
             };
 
@@ -106,3 +137,26 @@ export const useCourses = () => {
 
   return { courses, loading, error, refetch: () => window.location.reload() };
 };
+
+// Helper function to infer category from title
+function inferCategory(title: string): string {
+  const titleLower = title.toLowerCase();
+  
+  if (titleLower.includes('math') || titleLower.includes('algebra') || titleLower.includes('calculus')) {
+    return 'Mathematics';
+  } else if (titleLower.includes('physics')) {
+    return 'Physics';
+  } else if (titleLower.includes('chemistry')) {
+    return 'Chemistry';
+  } else if (titleLower.includes('biology') || titleLower.includes('bio')) {
+    return 'Biology';
+  } else if (titleLower.includes('programming') || titleLower.includes('code') || titleLower.includes('software')) {
+    return 'Programming';
+  } else if (titleLower.includes('english') || titleLower.includes('literature')) {
+    return 'Literature';
+  } else if (titleLower.includes('history')) {
+    return 'History';
+  }
+  
+  return 'General Studies';
+}
